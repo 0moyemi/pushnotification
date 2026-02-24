@@ -2,11 +2,14 @@
 import { NextRequest } from "next/server";
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI!;
-const client = new MongoClient(uri);
 const dbName = "pushnotiftest";
 
 export async function POST(req: NextRequest) {
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+        return new Response("Missing MONGODB_URI", { status: 500 });
+    }
+    const client = new MongoClient(uri);
     try {
         const { token, sendAt, title, body } = await req.json();
         if (!token || !sendAt || !title || !body) {
@@ -19,5 +22,7 @@ export async function POST(req: NextRequest) {
         return new Response(JSON.stringify({ success: true }), { status: 200 });
     } catch (err: any) {
         return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500 });
+    } finally {
+        await client.close();
     }
 }

@@ -3,21 +3,22 @@
 import { NextRequest } from "next/server";
 
 // --- INSERT YOUR SERVICE ACCOUNT JSON PATH BELOW ---
-// Load service account from environment variable for deployment
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : undefined; // Removed the JSON file requirement
 
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 
-if (!getApps().length) {
-    initializeApp({
-        credential: cert(serviceAccount),
-    });
-}
-
 export async function POST(req: NextRequest) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+        : undefined;
+    if (!serviceAccount) {
+        return new Response("Missing FIREBASE_SERVICE_ACCOUNT", { status: 500 });
+    }
+    if (!getApps().length) {
+        initializeApp({
+            credential: cert(serviceAccount),
+        });
+    }
     try {
         const { token } = await req.json();
         if (!token) return new Response("Missing token", { status: 400 });
