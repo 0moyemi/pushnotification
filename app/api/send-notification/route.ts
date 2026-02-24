@@ -3,8 +3,10 @@
 import { NextRequest } from "next/server";
 
 // --- INSERT YOUR SERVICE ACCOUNT JSON PATH BELOW ---
-// Place your service account JSON in the root or a secure location and update the path
-const serviceAccount = require("../../../testing-27f81-firebase-adminsdk-fbsvc-4c300335e7.json");
+// Load service account from environment variable for deployment
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : undefined; // Removed the JSON file requirement
 
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
