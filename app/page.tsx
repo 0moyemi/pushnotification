@@ -72,27 +72,50 @@ export default function Home() {
           <div className="mt-2 break-all text-xs text-gray-400">Token: {token}</div>
         )}
         {status === "Push enabled!" && (
-          <form
-            className="mt-4 w-full"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setStatus("Sending test notification...");
-              const res = await fetch("/api/send-notification", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token }),
-              });
-              if (res.ok) setStatus("Test notification sent!");
-              else setStatus("Failed to send notification.");
-            }}
-          >
-            <button
-              type="submit"
-              className="bg-green-600 text-white px-4 py-2 rounded w-full hover:bg-green-700 transition"
+          <>
+            <form
+              className="mt-4 w-full"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setStatus("Sending test notification...");
+                const res = await fetch("/api/send-notification", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ token }),
+                });
+                if (res.ok) setStatus("Test notification sent!");
+                else setStatus("Failed to send notification.");
+              }}
             >
-              Send Test Notification
+              <button
+                type="submit"
+                className="bg-green-600 text-white px-4 py-2 rounded w-full hover:bg-green-700 transition"
+              >
+                Send Test Notification
+              </button>
+            </form>
+            <button
+              className="bg-purple-600 text-white px-4 py-2 rounded w-full hover:bg-purple-700 transition mt-2"
+              onClick={async () => {
+                setStatus("Scheduling notification for 1 minute later...");
+                const sendAt = new Date(Date.now() + 60 * 1000).toISOString();
+                const res = await fetch("/api/schedule", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    token,
+                    sendAt,
+                    title: "Scheduled Test",
+                    body: "This notification was scheduled 1 minute ago.",
+                  }),
+                });
+                if (res.ok) setStatus("Scheduled notification for 1 minute later!");
+                else setStatus("Failed to schedule notification.");
+              }}
+            >
+              Schedule Test Notification (1 min later)
             </button>
-          </form>
+          </>
         )}
       </div>
     </main>
