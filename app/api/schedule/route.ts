@@ -1,7 +1,7 @@
 // app/api/schedule/route.ts
+
 import { NextRequest } from "next/server";
 import { MongoClient } from "mongodb";
-
 const dbName = "pushnotiftest";
 
 export async function POST(req: NextRequest) {
