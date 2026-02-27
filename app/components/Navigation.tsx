@@ -16,10 +16,10 @@ export default function Navigation() {
     return (
         <>
             {/* Mobile Header */}
-            <header className="lg:hidden sticky top-0 z-50 bg-[#081f44] shadow-md">
+            <header className="lg:hidden sticky top-0 z-50 bg-[#050e23] shadow-md">
                 <div className="flex items-center justify-between px-4 py-3">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shadow-lg bg-white">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8  overflow-hidden flex items-center justify-center shadow-lg">
                             <img src="/1010 Primary Logo.png" alt="App Logo" className="object-contain w-full h-full" />
                         </div>
                         <h1 className="text-xl font-bold text-white tracking-tight">Sales Ast.</h1>
@@ -35,7 +35,7 @@ export default function Navigation() {
                 </div>
                 {showSections && (
                     <nav
-                        className="transition-all duration-300 ease-in-out bg-[#10244d] px-4 border-t border-blue-900 lg:hidden py-4 max-h-[500px] opacity-100"
+                        className="transition-all duration-300 ease-in-out bg-[#050e23] px-4 border-t border-blue-900 lg:hidden py-4 max-h-[500px] opacity-100"
                         aria-label="Main navigation"
                     >
                         <div className="grid grid-cols-2 gap-3">
@@ -57,10 +57,10 @@ export default function Navigation() {
             </header>
 
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:w-72 lg:border-r bg-[#081f44] border-blue-900 shadow-xl">
+            <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:w-72 lg:border-r bg-[#050e23] border-blue-900 shadow-xl">
                 <div className="p-6 border-b border-blue-900">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shadow-lg bg-white">
+                        <div className="w-7 h-7 rounded-xl overflow-hidden flex items-center justify-center shadow-lg bg-white">
                             <img src="/1010 Primary Logo.png" alt="App Logo" className="object-contain w-full h-full" />
                         </div>
                         <h1 className="text-xl font-bold text-white tracking-tight">Sales Ast.</h1>
