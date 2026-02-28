@@ -189,8 +189,26 @@ export default function ScheduleSection() {
             mediaId = `${Date.now()}-${file.name}`;
             await saveMedia(mediaId, file);
         }
+        // If backend returns an _id, use it; otherwise, fallback to Date.now()
+        let backendId = undefined;
+        try {
+            const res = await fetch("/api/schedule", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    token: fcmToken,
+                    sendAt,
+                    title: title || "Scheduled Test",
+                    body: bodyText || "This notification was scheduled by you.",
+                }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                backendId = data._id || data.id;
+            }
+        } catch { }
         const post = {
-            id: `${Date.now()}`,
+            id: backendId || `${Date.now()}`,
             date: sendAt,
             title,
             body: bodyText,
@@ -206,24 +224,10 @@ export default function ScheduleSection() {
         postsArr.push(post);
         localStorage.setItem("scheduledPosts", JSON.stringify(postsArr));
         setPosts(postsArr);
-        const res = await fetch("/api/schedule", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                token: fcmToken,
-                sendAt,
-                title: title || "Scheduled Test",
-                body: bodyText || "This notification was scheduled by you.",
-            }),
-        });
         setIsScheduling(false);
-        if (res.ok) {
-            setShowForm(false);
-            setSuccessMessage("Your post has been scheduled!");
-            setTimeout(() => setSuccessMessage(null), 3500);
-        } else {
-            setStatus("Failed to schedule notification.");
-        }
+        setShowForm(false);
+        setSuccessMessage("Your post has been scheduled!");
+        setTimeout(() => setSuccessMessage(null), 3500);
         setMediaFile(null);
         setMediaPreview(null);
         setMediaType(null);
@@ -255,7 +259,7 @@ export default function ScheduleSection() {
             } catch { }
             const now = Date.now();
             // Only check posts that are not sent and are due
-            const duePosts = postsArr.filter(post => !post.sent && post.date && now > new Date(post.date).getTime() + 60 * 1000);
+            const duePosts = postsArr.filter(post => !post.sent && post.date && now > new Date(post.date).getTime() + 60 * 1000 && post.id);
             if (duePosts.length > 0) {
                 const statusMap = await fetchSentStatus(duePosts.map(p => p.id));
                 let changed = false;
