@@ -1,7 +1,28 @@
+"use client"
 import React, { useState, useRef, useEffect } from "react";
+// ...existing code...
+// Helper to fetch sent status from backend
+async function fetchSentStatus(postIds: string[]): Promise<Record<string, boolean>> {
+    // Replace with your actual API endpoint
+    const res = await fetch("/api/sent-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: postIds }),
+    });
+    if (!res.ok) return {};
+    return await res.json(); // { [id]: true/false }
+}
 import { getFirebaseMessaging, getToken, VAPID_PUBLIC_KEY } from "../../lib/firebaseClient";
-import { Plus, Calendar } from "lucide-react";
+import { Plus, Calendar, ChevronDown, ChevronUp, Trash2, Share2 } from "lucide-react";
 import { saveMedia, getMedia, deleteMedia } from "../../lib/scheduleDb";
+
+// Helper: get next 15-min slot
+function getNext15MinISO() {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    now.setMinutes(now.getMinutes() + 15 - (now.getMinutes() % 15));
+    return now.toISOString().slice(0, 16);
+}
 
 // MediaPreview component for displaying media from IndexedDB
 function MediaPreview({ mediaId, mediaType }: { mediaId: string, mediaType: string }) {
@@ -84,6 +105,7 @@ export default function ScheduleSection() {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [isScheduling, setIsScheduling] = useState(false);
     const [sentInfo, setSentInfo] = useState<string | null>(null);
+    const [accordionOpen, setAccordionOpen] = useState(false);
 
     // Load posts from localStorage on mount
     useEffect(() => {
@@ -175,6 +197,7 @@ export default function ScheduleSection() {
             mediaId,
             mediaType: fileType,
             sent: false,
+            created: Date.now(),
         };
         let postsArr = [];
         try {
@@ -206,7 +229,103 @@ export default function ScheduleSection() {
         setMediaType(null);
     }
 
+    // Auto-delete sent posts after 3 days
+    useEffect(() => {
+        const now = Date.now();
+        const updated = posts.filter(post => !(post.sent && post.created && now - post.created > 3 * 24 * 60 * 60 * 1000));
+        if (updated.length !== posts.length) {
+            setPosts(updated);
+            localStorage.setItem("scheduledPosts", JSON.stringify(updated));
+        }
+    }, [posts]);
+
+    // Fix cursor bug: force pointer-events on modal overlay
+    useEffect(() => {
+        if (showForm) {
+            document.body.style.cursor = "auto";
+        }
+    }, [showForm]);
+
+    // Periodically check sent status from backend (MongoDB)
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            let postsArr: any[] = [];
+            try {
+                postsArr = JSON.parse(localStorage.getItem("scheduledPosts") || "[]");
+            } catch { }
+            const now = Date.now();
+            // Only check posts that are not sent and are due
+            const duePosts = postsArr.filter(post => !post.sent && post.date && now > new Date(post.date).getTime() + 60 * 1000);
+            if (duePosts.length > 0) {
+                const statusMap = await fetchSentStatus(duePosts.map(p => p.id));
+                let changed = false;
+                const newPosts = postsArr.map(post => {
+                    if (statusMap[post.id] === true && !post.sent) {
+                        changed = true;
+                        return { ...post, sent: true };
+                    }
+                    return post;
+                });
+                if (changed) {
+                    localStorage.setItem("scheduledPosts", JSON.stringify(newPosts));
+                    setPosts(newPosts);
+                }
+            }
+        }, 15000); // Check every 15 seconds
+        return () => clearInterval(interval);
+    }, [posts]);
+
+    // Share to WhatsApp (caption + media)
+    async function shareToWhatsApp(post: any) {
+        const caption = post.title || '';
+        // Copy caption to clipboard
+        try {
+            await navigator.clipboard.writeText(caption);
+            setSuccessMessage('Caption copied to clipboard!');
+            setTimeout(() => setSuccessMessage(null), 2000);
+        } catch {
+            alert('Failed to copy caption to clipboard.');
+        }
+        // Try to get media from IndexedDB
+        if (post.mediaId && post.mediaType) {
+            try {
+                const blob = await getMedia(post.mediaId);
+                if (blob) {
+                    // Try Web Share API with files
+                    if (navigator.canShare && navigator.canShare({ files: [new File([blob], 'media', { type: post.mediaType })] })) {
+                        try {
+                            await navigator.share({
+                                files: [new File([blob], 'media', { type: post.mediaType })],
+                                text: caption,
+                                title: 'Share to WhatsApp',
+                            });
+                            return;
+                        } catch (err: any) {
+                            const msg = typeof err === 'object' && err && 'message' in err ? (err as any).message : String(err);
+                            alert('Sharing failed: ' + msg);
+                            return;
+                        }
+                    } else {
+                        alert('Sharing media is not supported on this device/browser.');
+                        return;
+                    }
+                } else {
+                    alert('Could not retrieve media for sharing.');
+                    return;
+                }
+            } catch {
+                alert('Could not retrieve media for sharing.');
+                return;
+            }
+        } else {
+            alert('No media found for this post. Only caption copied.');
+        }
+    }
+
     // Render
+    // Split posts
+    const unsentPosts = posts.filter(p => !p.sent && p.date && new Date(p.date).toDateString() === selectedDate.toDateString());
+    const sentPosts = posts.filter(p => p.sent && p.date && new Date(p.date).toDateString() === selectedDate.toDateString());
     return (
         <div className="min-h-screen bg-[#050e23] lg:pl-72 py-8 flex flex-col items-center">
             {/* Permission Modal */}
@@ -253,29 +372,36 @@ export default function ScheduleSection() {
                                     const day = date.getDate();
                                     const isToday = date.toDateString() === today.toDateString();
                                     const isSelected = date.toDateString() === selectedDate.toDateString();
-                                    const isDisabled = date < today && (date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear());
+                                    // Allow navigation to any day, but only enable scheduling for today/future
+                                    const isPast = date < today && (date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear());
+                                    const hasPost = posts.some(p => p.date && new Date(p.date).toDateString() === date.toDateString());
                                     return (
                                         <button
                                             key={date.toISOString()}
-                                            disabled={isDisabled}
+                                            disabled={false}
                                             className={[
-                                                "aspect-square w-full flex flex-col items-center justify-center rounded-xl font-semibold text-sm transition-all border",
+                                                "aspect-square w-full flex flex-col items-center justify-center rounded-xl font-semibold text-sm transition-all border relative",
                                                 isToday ? "border-blue-400 bg-blue-950 text-blue-200 shadow-md" :
                                                     isSelected ? "border-blue-600 bg-blue-800 text-white shadow-lg" :
-                                                        isDisabled ? "border-blue-900 bg-[#050e23] text-blue-900 opacity-40 cursor-not-allowed" :
+                                                        isPast ? "border-blue-900 bg-[#050e23] text-blue-900 opacity-40" :
                                                             "border-blue-900 bg-blue-950 text-blue-100 hover:bg-blue-900 hover:text-white cursor-pointer"
                                             ].join(" ")}
                                             onClick={() => setSelectedDate(date)}
                                         >
                                             <span>{day}</span>
+                                            {hasPost && (
+                                                <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-green-500 border border-white"></span>
+                                            )}
                                         </button>
                                     );
                                 })}
                             </div>
                             {/* Add Post Button */}
+                            {/* Only enable scheduling for today/future */}
                             <button
-                                className="w-full mb-6 py-4 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl active:scale-98 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+                                className="w-full mb-6 py-4 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl active:scale-98 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white disabled:opacity-40 disabled:cursor-not-allowed"
                                 onClick={() => setShowForm((v) => !v)}
+                                disabled={selectedDate.setHours(0, 0, 0, 0) < today.setHours(0, 0, 0, 0)}
                             >
                                 <Plus size={24} strokeWidth={2.5} />
                                 {showForm ? "Close" : "Add Scheduled Post"}
@@ -288,8 +414,14 @@ export default function ScheduleSection() {
                                     >
                                         <button type="button" onClick={() => { setShowForm(false); setMediaFile(null); setMediaPreview(null); setMediaType(null); }} className="absolute top-3 right-3 text-blue-200 hover:text-white text-xl font-bold rounded-full w-8 h-8 flex items-center justify-center bg-blue-900/60 hover:bg-blue-900 transition-all focus:outline-none" aria-label="Close">×</button>
                                         <h3 className="text-2xl font-bold text-white mb-2">Add Scheduled Post</h3>
-                                        <div className="flex flex-col items-center gap-2">
-                                            <div className="w-32 h-32 bg-blue-950 border-2 border-dashed border-blue-700 rounded-xl flex items-center justify-center text-blue-400 text-4xl mb-2 overflow-hidden">
+                                        {/* Clickable Media Box - Centered */}
+                                        <div className="flex justify-center w-full">
+                                            <div
+                                                className="w-32 h-32 bg-blue-950 border-2 border-dashed border-blue-700 rounded-xl flex items-center justify-center text-blue-400 text-4xl mb-2 overflow-hidden cursor-pointer"
+                                                tabIndex={0}
+                                                onClick={() => fileInputRef.current?.click()}
+                                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+                                            >
                                                 {mediaPreview ? (
                                                     mediaType && mediaType.startsWith("video") ? (
                                                         <video src={mediaPreview} className="w-full h-full object-cover" controls />
@@ -300,38 +432,38 @@ export default function ScheduleSection() {
                                                     <span>📷</span>
                                                 )}
                                             </div>
-                                            <input
-                                                type="file"
-                                                accept="image/*,video/*"
-                                                ref={fileInputRef}
-                                                style={{ display: "none" }}
-                                                onChange={e => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) {
-                                                        setMediaFile(file);
-                                                        setMediaType(file.type);
-                                                        const url = URL.createObjectURL(file);
-                                                        setMediaPreview(url);
-                                                    }
-                                                }}
-                                            />
+                                        </div>
+                                        <input
+                                            type="file"
+                                            accept="image/*,video/*"
+                                            ref={fileInputRef}
+                                            style={{ display: "none" }}
+                                            onChange={e => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    setMediaFile(file);
+                                                    setMediaType(file.type);
+                                                    const url = URL.createObjectURL(file);
+                                                    setMediaPreview(url);
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="text-blue-400 underline text-xs"
+                                            onClick={() => fileInputRef.current?.click()}
+                                        >
+                                            {mediaFile ? "Change Media" : "Select Image or Video"}
+                                        </button>
+                                        {mediaFile && (
                                             <button
                                                 type="button"
-                                                className="text-blue-400 underline text-xs"
-                                                onClick={() => fileInputRef.current?.click()}
+                                                className="text-red-400 underline text-xs mt-1"
+                                                onClick={() => { setMediaFile(null); setMediaPreview(null); setMediaType(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                                             >
-                                                {mediaFile ? "Change Media" : "Select Image or Video"}
+                                                Remove Media
                                             </button>
-                                            {mediaFile && (
-                                                <button
-                                                    type="button"
-                                                    className="text-red-400 underline text-xs mt-1"
-                                                    onClick={() => { setMediaFile(null); setMediaPreview(null); setMediaType(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                                                >
-                                                    Remove Media
-                                                </button>
-                                            )}
-                                        </div>
+                                        )}
                                         <div className="flex flex-col gap-2">
                                             <label className="text-white text-sm font-medium" htmlFor="sendAt">Pick date & time:</label>
                                             <input
@@ -340,18 +472,18 @@ export default function ScheduleSection() {
                                                 id="sendAt"
                                                 required
                                                 min={getMinDateTime()}
+                                                defaultValue={getNext15MinISO()}
                                                 className="rounded px-3 py-2 text-black border border-blue-300 focus:ring-2 focus:ring-blue-500"
                                                 style={{ background: '#fff' }}
                                             />
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <label className="text-white text-sm font-medium" htmlFor="title">Caption:</label>
-                                            <input
-                                                type="text"
+                                            <textarea
                                                 name="title"
                                                 id="title"
                                                 placeholder="Enter caption"
-                                                className="rounded px-3 py-2 text-black border border-blue-300 focus:ring-2 focus:ring-blue-500"
+                                                className="rounded px-3 py-2 text-black border border-blue-300 focus:ring-2 focus:ring-blue-500 min-h-[48px]"
                                                 style={{ background: '#fff' }}
                                             />
                                         </div>
@@ -370,7 +502,7 @@ export default function ScheduleSection() {
                                 </div>
                             )}
                             {/* Daily View */}
-                            <div className="mt-8 px-6">
+                            <div className="mt-8 px-2 sm:px-6">
                                 <h4 className="text-lg font-bold text-white mb-3">Scheduled Posts for {selectedDate.toLocaleDateString()}</h4>
                                 {successMessage && (
                                     <div className="mb-4 p-3 rounded-xl bg-green-700/80 text-white text-center font-semibold animate-fadeIn">
@@ -382,35 +514,113 @@ export default function ScheduleSection() {
                                         <span className="mr-2">✅</span>{sentInfo}
                                     </div>
                                 )}
-                                <div className="bg-blue-950 border border-blue-900 rounded-2xl p-8 text-center text-blue-200 flex flex-col items-center">
-                                    <div className="mb-4">
-                                        <span className="text-4xl">📅</span>
-                                    </div>
-                                    {posts.filter(post => post.date && new Date(post.date).toDateString() === selectedDate.toDateString()).length === 0 ? (
-                                        <div className="mb-4">No posts scheduled for this day.</div>
-                                    ) : (
-                                        <div className="w-full flex flex-col gap-4">
-                                            {posts.filter(post => post.date && new Date(post.date).toDateString() === selectedDate.toDateString()).map(post => (
-                                                <div key={post.id} className="bg-blue-900/60 rounded-xl p-4 flex flex-col items-center gap-2 border border-blue-800">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-white">{post.title}</span>
-                                                        {post.sent && <span className="ml-2 text-green-400 text-xs">Sent</span>}
-                                                    </div>
-                                                    <div className="text-blue-200 text-xs mb-1">{post.date ? new Date(post.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</div>
+                                {/* Unsent posts */}
+                                <div className="flex flex-col gap-4">
+                                    {unsentPosts.length === 0 && <div className="mb-4 text-blue-200">No posts scheduled for this day.</div>}
+                                    {unsentPosts.map(post => (
+                                        <div key={post.id} className="bg-blue-900/60 rounded-xl p-4 flex flex-col items-center gap-2 border border-blue-800 w-full">
+                                            {post.mediaId && post.mediaType && (
+                                                <MediaPreview mediaId={post.mediaId} mediaType={post.mediaType} />
+                                            )}
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-xs px-2 py-1 rounded bg-blue-700 text-white font-semibold">
+                                                    {post.date ? new Date(post.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                </span>
+                                                <span className="text-xs px-2 py-1 rounded bg-yellow-600 text-white font-semibold">Not Sent</span>
+                                            </div>
+                                            <div className="text-white font-bold text-base text-center mt-1">
+                                                {post.title ? post.title.split(" ").slice(0, 3).join(" ") : "No Caption"}
+                                            </div>
+                                            <div className="text-blue-300 text-xs mt-1 text-center break-words max-w-full">
+                                                {post.title}
+                                            </div>
+                                            <div className="flex w-full gap-2 mt-2 justify-center">
+                                                <button
+                                                    className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium flex items-center gap-1 text-sm shadow-sm transition-all"
+                                                    style={{ minWidth: 0 }}
+                                                    onClick={() => shareToWhatsApp(post)}
+                                                    type="button"
+                                                >
+                                                    <Share2 size={14} /> Share to WhatsApp
+                                                </button>
+                                                <button
+                                                    className="px-3 py-1.5 rounded-lg bg-transparent text-red-400 font-medium flex items-center gap-1 text-sm border border-red-400 hover:bg-red-900/20 shadow-sm transition-all"
+                                                    style={{ minWidth: 0 }}
+                                                    onClick={async () => {
+                                                        if (window.confirm('Are you sure you want to delete this post?')) {
+                                                            const updated = posts.filter(p => p.id !== post.id);
+                                                            setPosts(updated);
+                                                            localStorage.setItem("scheduledPosts", JSON.stringify(updated));
+                                                            if (post.mediaId) await deleteMedia(post.mediaId);
+                                                        }
+                                                    }}
+                                                    type="button"
+                                                >
+                                                    <Trash2 size={14} /> Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Sent posts accordion */}
+                                <div className="mt-6">
+                                    <button
+                                        className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-blue-800/60 text-white font-bold text-base mb-2"
+                                        onClick={() => setAccordionOpen(v => !v)}
+                                        type="button"
+                                    >
+                                        Sent Posts ({sentPosts.length})
+                                        {accordionOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    </button>
+                                    {accordionOpen && (
+                                        <div className="flex flex-col gap-4">
+                                            {sentPosts.length === 0 && <div className="text-blue-200">No sent posts.</div>}
+                                            {sentPosts.map(post => (
+                                                <div key={post.id} className="bg-blue-900/40 rounded-xl p-4 flex flex-col items-center gap-2 border border-blue-800 w-full">
                                                     {post.mediaId && post.mediaType && (
                                                         <MediaPreview mediaId={post.mediaId} mediaType={post.mediaType} />
                                                     )}
-                                                    <div className="text-blue-300 text-xs mt-1">{post.body}</div>
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <span className="text-xs px-2 py-1 rounded bg-blue-700 text-white font-semibold">
+                                                            {post.date ? new Date(post.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                        </span>
+                                                        <span className="text-xs px-2 py-1 rounded bg-green-600 text-white font-semibold">Sent</span>
+                                                    </div>
+                                                    <div className="text-white font-bold text-base text-center mt-1">
+                                                        {post.title ? post.title.split(" ").slice(0, 3).join(" ") : "No Caption"}
+                                                    </div>
+                                                    <div className="text-blue-300 text-xs mt-1 text-center break-words max-w-full">
+                                                        {post.title}
+                                                    </div>
+                                                    <div className="flex w-full gap-2 mt-2 justify-center">
+                                                        <button
+                                                            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium flex items-center gap-1 text-sm shadow-sm transition-all"
+                                                            style={{ minWidth: 0 }}
+                                                            onClick={() => shareToWhatsApp(post)}
+                                                            type="button"
+                                                        >
+                                                            <Share2 size={14} /> WhatsApp
+                                                        </button>
+                                                        <button
+                                                            className="px-3 py-1.5 rounded-lg bg-transparent text-red-400 font-medium flex items-center gap-1 text-sm border border-red-400 hover:bg-red-900/20 shadow-sm transition-all"
+                                                            style={{ minWidth: 0 }}
+                                                            onClick={async () => {
+                                                                if (window.confirm('Are you sure you want to delete this post?')) {
+                                                                    const updated = posts.filter(p => p.id !== post.id);
+                                                                    setPosts(updated);
+                                                                    localStorage.setItem("scheduledPosts", JSON.stringify(updated));
+                                                                    if (post.mediaId) await deleteMedia(post.mediaId);
+                                                                }
+                                                            }}
+                                                            type="button"
+                                                        >
+                                                            <Trash2 size={14} /> Delete
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
                                     )}
-                                    <button
-                                        className="py-3 px-6 rounded-xl font-bold transition-all bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg mt-2 shadow"
-                                        onClick={() => setShowForm(true)}
-                                    >
-                                        + Add Scheduled Post
-                                    </button>
                                 </div>
                             </div>
                         </>

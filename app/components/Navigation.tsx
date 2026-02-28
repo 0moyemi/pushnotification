@@ -1,17 +1,19 @@
+"use client";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Package, CheckCircle, MessageSquare, UserCheck } from "lucide-react";
-
-
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+
 
 export default function Navigation() {
     const navItems = [
-        { href: "/schedule", label: "Schedule", icon: Package, active: true },
-        { href: "/daily-status", label: "Daily Status", icon: CheckCircle, active: false },
-        { href: "/follow-ups", label: "Follow-Ups", icon: UserCheck, active: false },
-        { href: "/templates", label: "Templates", icon: MessageSquare, active: false },
+        { href: "/schedule", label: "Schedule", icon: Package },
+        { href: "/daily-status", label: "Daily Status", icon: CheckCircle },
+        { href: "/follow-ups", label: "Follow-Ups", icon: UserCheck },
+        { href: "/templates", label: "Templates", icon: MessageSquare },
     ];
     const [showSections, setShowSections] = useState(true);
+    const pathname = usePathname();
 
     return (
         <>
@@ -41,14 +43,16 @@ export default function Navigation() {
                         <div className="grid grid-cols-2 gap-3">
                             {navItems.map((item) => {
                                 const Icon = item.icon;
+                                const isActive = pathname.startsWith(item.href);
                                 return (
-                                    <div
-                                        key={item.href}
-                                        className={`flex flex-col items-center justify-center gap-2.5 py-5 px-4 rounded-2xl font-bold transition-all shadow-sm ${item.active ? "bg-gradient-to-br from-blue-700 to-blue-900 text-white" : "bg-blue-950 text-blue-200 opacity-60"} ${item.active ? "shadow-lg" : ""}`}
-                                    >
-                                        <Icon size={32} strokeWidth={2.5} />
-                                        <span className="text-xs leading-tight text-center">{item.label}</span>
-                                    </div>
+                                    <Link href={item.href} key={item.href} className="focus:outline-none">
+                                        <div
+                                            className={`flex flex-col items-center justify-center gap-2.5 py-5 px-4 rounded-2xl font-bold transition-all shadow-sm ${isActive ? "bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-lg" : "bg-blue-950 text-blue-200 opacity-60"}`}
+                                        >
+                                            <Icon size={32} strokeWidth={2.5} />
+                                            <span className="text-xs leading-tight text-center">{item.label}</span>
+                                        </div>
+                                    </Link>
                                 );
                             })}
                         </div>
@@ -69,14 +73,16 @@ export default function Navigation() {
                 <nav className="flex-1 p-5 space-y-2">
                     {navItems.map((item) => {
                         const Icon = item.icon;
+                        const isActive = pathname.startsWith(item.href);
                         return (
-                            <div
-                                key={item.href}
-                                className={`flex items-center gap-4 px-5 py-4 rounded-xl font-semibold transition-all ${item.active ? "bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-lg" : "bg-blue-950 text-blue-200 opacity-60"}`}
-                            >
-                                <Icon size={24} strokeWidth={2.5} />
-                                <span className="text-base">{item.label}</span>
-                            </div>
+                            <Link href={item.href} key={item.href} className="focus:outline-none">
+                                <div
+                                    className={`flex items-center gap-4 px-5 py-4 rounded-xl font-semibold transition-all ${isActive ? "bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-lg" : "bg-blue-950 text-blue-200 opacity-60"}`}
+                                >
+                                    <Icon size={24} strokeWidth={2.5} />
+                                    <span className="text-base">{item.label}</span>
+                                </div>
+                            </Link>
                         );
                     })}
                 </nav>
