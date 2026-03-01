@@ -13,7 +13,7 @@ async function fetchSentStatus(postIds: string[]): Promise<Record<string, boolea
     return await res.json(); // { [id]: true/false }
 }
 import { getFirebaseMessaging, getToken, VAPID_PUBLIC_KEY } from "../../lib/firebaseClient";
-import { Plus, Calendar, ChevronDown, ChevronUp, Trash2, Share2 } from "lucide-react";
+import { Plus, Calendar, ChevronDown, Trash2, Share2 } from "lucide-react";
 import { saveMedia, getMedia, deleteMedia } from "../../lib/scheduleDb";
 
 // Helper: get next 15-min slot
@@ -377,22 +377,27 @@ export default function ScheduleSection() {
                                     const day = date.getDate();
                                     const isToday = date.toDateString() === today.toDateString();
                                     const isSelected = date.toDateString() === selectedDate.toDateString();
-                                    // Allow navigation to any day, but only enable scheduling for today/future
-                                    const isPast = date < today && (date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear());
                                     const hasPost = posts.some(p => p.date && new Date(p.date).toDateString() === date.toDateString());
+                                    // Past = strictly before today at midnight
+                                    const todayMid = new Date(today); todayMid.setHours(0, 0, 0, 0);
+                                    const dateMid = new Date(date); dateMid.setHours(0, 0, 0, 0);
+                                    const isPast = dateMid < todayMid;
+                                    // Muted = past AND no posts (nothing to review, can't schedule there)
+                                    const isMuted = isPast && !hasPost;
                                     return (
                                         <button
                                             key={date.toISOString()}
-                                            disabled={false}
+                                            disabled={isMuted}
                                             className={[
-                                                "aspect-square w-full flex flex-col items-center justify-center rounded-xl font-semibold text-sm transition-all border relative",
+                                                "aspect-square w-full flex flex-col items-center justify-center rounded-xl font-semibold text-sm transition-all duration-150 border relative",
                                                 isSelected && isToday ? "border-blue-400 ring-2 ring-blue-400 bg-blue-800 text-white shadow-lg" :
                                                     isToday ? "border-blue-400 bg-blue-950 text-blue-200 shadow-md" :
                                                         isSelected ? "border-blue-600 bg-blue-800 text-white shadow-lg" :
-                                                            isPast ? "border-blue-900 bg-[#050e23] text-blue-900 opacity-40" :
-                                                                "border-blue-900 bg-blue-950 text-blue-100 hover:bg-blue-900 hover:text-white cursor-pointer"
+                                                            isMuted ? "border-transparent bg-transparent text-blue-900 opacity-25 cursor-not-allowed" :
+                                                                isPast ? "border-blue-900/50 bg-blue-950/40 text-blue-500 opacity-60 hover:bg-blue-900 hover:text-white cursor-pointer" :
+                                                                    "border-blue-900 bg-blue-950 text-blue-100 hover:bg-blue-800 hover:text-white cursor-pointer"
                                             ].join(" ")}
-                                            onClick={() => setSelectedDate(date)}
+                                            onClick={() => !isMuted && setSelectedDate(date)}
                                         >
                                             <span>{day}</span>
                                             {hasPost && (
@@ -529,7 +534,7 @@ export default function ScheduleSection() {
                                         </div>
                                     )}
                                     {unsentPosts.map(post => (
-                                        <div key={post.id} className="bg-blue-900/60 rounded-xl p-4 flex flex-col items-center gap-2 border border-blue-800 w-full">
+                                        <div key={post.id} className="animate-fadeIn bg-blue-900/60 rounded-xl p-4 flex flex-col items-center gap-2 border border-blue-800 w-full">
                                             {post.mediaId && post.mediaType && (
                                                 <MediaPreview mediaId={post.mediaId} mediaType={post.mediaType} />
                                             )}
@@ -552,7 +557,7 @@ export default function ScheduleSection() {
                                                     <Share2 size={14} /> Share to WhatsApp
                                                 </button>
                                                 {confirmDeleteId === post.id ? (
-                                                    <div className="flex gap-1 items-center">
+                                                    <div className="animate-popIn flex gap-1 items-center">
                                                         <button
                                                             className="px-2 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all"
                                                             onClick={async () => {
@@ -587,18 +592,20 @@ export default function ScheduleSection() {
                                 {/* Sent posts accordion */}
                                 <div className="mt-6">
                                     <button
-                                        className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-blue-800/60 text-white font-bold text-base mb-2"
+                                        className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-blue-800/60 text-white font-bold text-base mb-2 hover:bg-blue-700/70 transition-colors duration-150"
                                         onClick={() => setAccordionOpen(v => !v)}
                                         type="button"
                                     >
                                         Sent Posts ({sentPosts.length})
-                                        {accordionOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                        <span className={`transition-transform duration-200 ${accordionOpen ? 'rotate-180' : 'rotate-0'}`}>
+                                            <ChevronDown size={20} />
+                                        </span>
                                     </button>
                                     {accordionOpen && (
-                                        <div className="flex flex-col gap-4">
+                                        <div className="animate-slideDown flex flex-col gap-4">
                                             {sentPosts.length === 0 && <div className="text-blue-200">No sent posts.</div>}
                                             {sentPosts.map(post => (
-                                                <div key={post.id} className="bg-blue-900/40 rounded-xl p-4 flex flex-col items-center gap-2 border border-blue-800 w-full">
+                                                <div key={post.id} className="animate-fadeIn bg-blue-900/40 rounded-xl p-4 flex flex-col items-center gap-2 border border-blue-800 w-full">
                                                     {post.mediaId && post.mediaType && (
                                                         <MediaPreview mediaId={post.mediaId} mediaType={post.mediaType} />
                                                     )}
@@ -621,7 +628,7 @@ export default function ScheduleSection() {
                                                             <Share2 size={14} /> WhatsApp
                                                         </button>
                                                         {confirmDeleteId === post.id ? (
-                                                            <div className="flex gap-1 items-center">
+                                                            <div className="animate-popIn flex gap-1 items-center">
                                                                 <button
                                                                     className="px-2 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all"
                                                                     onClick={async () => {

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Package, CheckCircle, MessageSquare, UserCheck } from "lucide-react";
+import { ChevronDown, Package, CheckCircle, MessageSquare, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 
@@ -36,35 +36,43 @@ export default function Navigation() {
                         aria-label={showSections ? "Hide menu" : "Show menu"}
                         onClick={() => setShowSections((v) => !v)}
                     >
-                        {showSections ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        <span className={`transition-transform duration-300 ${showSections ? 'rotate-180' : 'rotate-0'}`}>
+                            <ChevronDown size={18} />
+                        </span>
                         {showSections ? "Hide" : "Show"}
                     </button>
                 </div>
-                {showSections && (
-                    <nav
-                        className="transition-all duration-300 ease-in-out bg-[#050e23] px-4 border-t border-blue-900 lg:hidden py-4 max-h-[500px] opacity-100"
-                        aria-label="Main navigation"
-                    >
-                        <div className="grid grid-cols-2 gap-3">
-                            {navItems.map((item) => {
-                                const Icon = item.icon;
-                                const isActive = item.href === "/schedule"
-                                    ? (pathname === "/" || pathname.startsWith("/schedule"))
-                                    : pathname.startsWith(item.href);
-                                return (
-                                    <Link href={item.href} key={item.href} className="focus:outline-none" onClick={handleNavClick}>
-                                        <div
-                                            className={`flex flex-col items-center justify-center gap-2.5 py-5 px-4 rounded-2xl font-bold transition-all shadow-sm ${isActive ? "bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-lg" : "bg-blue-950 text-blue-200 opacity-60"}`}
-                                        >
-                                            <Icon size={32} strokeWidth={2.5} />
-                                            <span className="text-xs leading-tight text-center">{item.label}</span>
-                                        </div>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    </nav>
-                )}
+                <nav
+                    className="bg-[#050e23] px-4 border-blue-900 lg:hidden overflow-hidden"
+                    style={{
+                        maxHeight: showSections ? '500px' : '0px',
+                        opacity: showSections ? 1 : 0,
+                        borderTopWidth: showSections ? '1px' : '0px',
+                        paddingTop: showSections ? '1rem' : '0',
+                        paddingBottom: showSections ? '1rem' : '0',
+                        transition: 'max-height 0.32s ease, opacity 0.25s ease, padding 0.25s ease',
+                    }}
+                    aria-label="Main navigation"
+                >
+                    <div className="grid grid-cols-2 gap-3">
+                        {navItems.map((item) => {
+                            const Icon = item.icon;
+                            const isActive = item.href === "/schedule"
+                                ? (pathname === "/" || pathname.startsWith("/schedule"))
+                                : pathname.startsWith(item.href);
+                            return (
+                                <Link href={item.href} key={item.href} className="focus:outline-none" onClick={handleNavClick}>
+                                    <div
+                                        className={`flex flex-col items-center justify-center gap-2.5 py-5 px-4 rounded-2xl font-bold transition-all shadow-sm ${isActive ? "bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-lg" : "bg-blue-950 text-blue-200 opacity-60"}`}
+                                    >
+                                        <Icon size={32} strokeWidth={2.5} />
+                                        <span className="text-xs leading-tight text-center">{item.label}</span>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </nav>
             </header>
 
             {/* Desktop Sidebar */}

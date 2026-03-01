@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navigation from "./components/Navigation";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
+import PageTransition from "./components/PageTransition";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://localhost:3000"),
@@ -40,7 +41,7 @@ export default function RootLayout({
         <ServiceWorkerRegister />
         <Navigation />
         <main className="min-h-screen">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </main>
       </body>
     </html>
