@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { getFirebaseMessaging, getToken, onMessage, VAPID_PUBLIC_KEY } from "../lib/firebaseClient";
-import Navigation from "./components/Navigation";
 import ScheduleSection from "./components/ScheduleSection";
 
 export default function Home() {
@@ -123,7 +122,6 @@ export default function Home() {
       </main>
       */}
       {/* New App UI */}
-      <Navigation />
       <ScheduleSection />
     </>
   );
