@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
             } catch {
                 return null;
             }
-        }).filter(Boolean);
+        }).filter((id): id is ObjectId => id !== null);
         const docs = await collection.find({ _id: { $in: objectIds } }).toArray();
         const statusMap: Record<string, boolean> = {};
         for (const doc of docs) {

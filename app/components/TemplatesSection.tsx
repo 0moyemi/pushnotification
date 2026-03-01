@@ -55,6 +55,7 @@ export default function TemplatesSection() {
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState({ title: '', icon: '', message: '' });
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     useEffect(() => {
         let savedTemplates = null;
@@ -102,9 +103,8 @@ export default function TemplatesSection() {
     };
 
     const handleDeleteTemplate = (id: string) => {
-        if (window.confirm('Are you sure you want to delete this template?')) {
-            setTemplates(templates.filter(t => t.id !== id));
-        }
+        setTemplates(templates.filter(t => t.id !== id));
+        setConfirmDeleteId(null);
     };
 
     const startEdit = (template: Template) => {
@@ -255,13 +255,26 @@ export default function TemplatesSection() {
                                             >
                                                 <Edit2 size={18} />
                                             </button>
-                                            <button
-                                                onClick={() => handleDeleteTemplate(template.id)}
-                                                className="p-2 rounded-lg transition-all bg-red-700 hover:bg-red-800 text-white"
-                                                title="Delete template"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            {confirmDeleteId === template.id ? (
+                                                <div className="flex gap-1 items-center">
+                                                    <button
+                                                        onClick={() => handleDeleteTemplate(template.id)}
+                                                        className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all"
+                                                    >Yes</button>
+                                                    <button
+                                                        onClick={() => setConfirmDeleteId(null)}
+                                                        className="px-2 py-1 rounded-lg bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs transition-all"
+                                                    >No</button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(template.id)}
+                                                    className="p-2 rounded-lg transition-all bg-red-700 hover:bg-red-800 text-white"
+                                                    title="Delete template"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

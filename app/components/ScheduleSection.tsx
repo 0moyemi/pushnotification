@@ -106,6 +106,7 @@ export default function ScheduleSection() {
     const [isScheduling, setIsScheduling] = useState(false);
     const [sentInfo, setSentInfo] = useState<string | null>(null);
     const [accordionOpen, setAccordionOpen] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     // Load posts from localStorage on mount
     useEffect(() => {
@@ -385,10 +386,11 @@ export default function ScheduleSection() {
                                             disabled={false}
                                             className={[
                                                 "aspect-square w-full flex flex-col items-center justify-center rounded-xl font-semibold text-sm transition-all border relative",
-                                                isToday ? "border-blue-400 bg-blue-950 text-blue-200 shadow-md" :
-                                                    isSelected ? "border-blue-600 bg-blue-800 text-white shadow-lg" :
-                                                        isPast ? "border-blue-900 bg-[#050e23] text-blue-900 opacity-40" :
-                                                            "border-blue-900 bg-blue-950 text-blue-100 hover:bg-blue-900 hover:text-white cursor-pointer"
+                                                isSelected && isToday ? "border-blue-400 ring-2 ring-blue-400 bg-blue-800 text-white shadow-lg" :
+                                                    isToday ? "border-blue-400 bg-blue-950 text-blue-200 shadow-md" :
+                                                        isSelected ? "border-blue-600 bg-blue-800 text-white shadow-lg" :
+                                                            isPast ? "border-blue-900 bg-[#050e23] text-blue-900 opacity-40" :
+                                                                "border-blue-900 bg-blue-950 text-blue-100 hover:bg-blue-900 hover:text-white cursor-pointer"
                                             ].join(" ")}
                                             onClick={() => setSelectedDate(date)}
                                         >
@@ -404,11 +406,11 @@ export default function ScheduleSection() {
                             {/* Only enable scheduling for today/future */}
                             <button
                                 className="w-full mb-6 py-4 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl active:scale-98 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                                onClick={() => setShowForm((v) => !v)}
+                                onClick={() => setShowForm(true)}
                                 disabled={selectedDate.setHours(0, 0, 0, 0) < today.setHours(0, 0, 0, 0)}
                             >
                                 <Plus size={24} strokeWidth={2.5} />
-                                {showForm ? "Close" : "Add Scheduled Post"}
+                                Add Scheduled Post
                             </button>
                             {showForm && (
                                 <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-2 sm:px-0 py-6 sm:py-0">
@@ -520,7 +522,12 @@ export default function ScheduleSection() {
                                 )}
                                 {/* Unsent posts */}
                                 <div className="flex flex-col gap-4">
-                                    {unsentPosts.length === 0 && <div className="mb-4 text-blue-200">No posts scheduled for this day.</div>}
+                                    {unsentPosts.length === 0 && (
+                                        <div className="mb-4 flex flex-col items-center gap-2 py-6 text-blue-200">
+                                            <Calendar size={36} className="text-blue-700 opacity-60" />
+                                            <span>No posts scheduled for this day.</span>
+                                        </div>
+                                    )}
                                     {unsentPosts.map(post => (
                                         <div key={post.id} className="bg-blue-900/60 rounded-xl p-4 flex flex-col items-center gap-2 border border-blue-800 w-full">
                                             {post.mediaId && post.mediaType && (
@@ -532,11 +539,8 @@ export default function ScheduleSection() {
                                                 </span>
                                                 <span className="text-xs px-2 py-1 rounded bg-yellow-600 text-white font-semibold">Not Sent</span>
                                             </div>
-                                            <div className="text-white font-bold text-base text-center mt-1">
-                                                {post.title ? post.title.split(" ").slice(0, 3).join(" ") : "No Caption"}
-                                            </div>
-                                            <div className="text-blue-300 text-xs mt-1 text-center break-words max-w-full">
-                                                {post.title}
+                                            <div className="text-white text-sm text-center mt-1 break-words max-w-full leading-snug">
+                                                {post.title || "No caption"}
                                             </div>
                                             <div className="flex w-full gap-2 mt-2 justify-center">
                                                 <button
@@ -547,21 +551,35 @@ export default function ScheduleSection() {
                                                 >
                                                     <Share2 size={14} /> Share to WhatsApp
                                                 </button>
-                                                <button
-                                                    className="px-3 py-1.5 rounded-lg bg-transparent text-red-400 font-medium flex items-center gap-1 text-sm border border-red-400 hover:bg-red-900/20 shadow-sm transition-all"
-                                                    style={{ minWidth: 0 }}
-                                                    onClick={async () => {
-                                                        if (window.confirm('Are you sure you want to delete this post?')) {
-                                                            const updated = posts.filter(p => p.id !== post.id);
-                                                            setPosts(updated);
-                                                            localStorage.setItem("scheduledPosts", JSON.stringify(updated));
-                                                            if (post.mediaId) await deleteMedia(post.mediaId);
-                                                        }
-                                                    }}
-                                                    type="button"
-                                                >
-                                                    <Trash2 size={14} /> Delete
-                                                </button>
+                                                {confirmDeleteId === post.id ? (
+                                                    <div className="flex gap-1 items-center">
+                                                        <button
+                                                            className="px-2 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all"
+                                                            onClick={async () => {
+                                                                const updated = posts.filter(p => p.id !== post.id);
+                                                                setPosts(updated);
+                                                                localStorage.setItem("scheduledPosts", JSON.stringify(updated));
+                                                                if (post.mediaId) await deleteMedia(post.mediaId);
+                                                                setConfirmDeleteId(null);
+                                                            }}
+                                                            type="button"
+                                                        >Yes, delete</button>
+                                                        <button
+                                                            className="px-2 py-1.5 rounded-lg bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs transition-all"
+                                                            onClick={() => setConfirmDeleteId(null)}
+                                                            type="button"
+                                                        >Cancel</button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        className="px-3 py-1.5 rounded-lg bg-transparent text-red-400 font-medium flex items-center gap-1 text-sm border border-red-400 hover:bg-red-900/20 shadow-sm transition-all"
+                                                        style={{ minWidth: 0 }}
+                                                        onClick={() => setConfirmDeleteId(post.id)}
+                                                        type="button"
+                                                    >
+                                                        <Trash2 size={14} /> Delete
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -590,11 +608,8 @@ export default function ScheduleSection() {
                                                         </span>
                                                         <span className="text-xs px-2 py-1 rounded bg-green-600 text-white font-semibold">Sent</span>
                                                     </div>
-                                                    <div className="text-white font-bold text-base text-center mt-1">
-                                                        {post.title ? post.title.split(" ").slice(0, 3).join(" ") : "No Caption"}
-                                                    </div>
-                                                    <div className="text-blue-300 text-xs mt-1 text-center break-words max-w-full">
-                                                        {post.title}
+                                                    <div className="text-white text-sm text-center mt-1 break-words max-w-full leading-snug">
+                                                        {post.title || "No caption"}
                                                     </div>
                                                     <div className="flex w-full gap-2 mt-2 justify-center">
                                                         <button
@@ -605,21 +620,35 @@ export default function ScheduleSection() {
                                                         >
                                                             <Share2 size={14} /> WhatsApp
                                                         </button>
-                                                        <button
-                                                            className="px-3 py-1.5 rounded-lg bg-transparent text-red-400 font-medium flex items-center gap-1 text-sm border border-red-400 hover:bg-red-900/20 shadow-sm transition-all"
-                                                            style={{ minWidth: 0 }}
-                                                            onClick={async () => {
-                                                                if (window.confirm('Are you sure you want to delete this post?')) {
-                                                                    const updated = posts.filter(p => p.id !== post.id);
-                                                                    setPosts(updated);
-                                                                    localStorage.setItem("scheduledPosts", JSON.stringify(updated));
-                                                                    if (post.mediaId) await deleteMedia(post.mediaId);
-                                                                }
-                                                            }}
-                                                            type="button"
-                                                        >
-                                                            <Trash2 size={14} /> Delete
-                                                        </button>
+                                                        {confirmDeleteId === post.id ? (
+                                                            <div className="flex gap-1 items-center">
+                                                                <button
+                                                                    className="px-2 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all"
+                                                                    onClick={async () => {
+                                                                        const updated = posts.filter(p => p.id !== post.id);
+                                                                        setPosts(updated);
+                                                                        localStorage.setItem("scheduledPosts", JSON.stringify(updated));
+                                                                        if (post.mediaId) await deleteMedia(post.mediaId);
+                                                                        setConfirmDeleteId(null);
+                                                                    }}
+                                                                    type="button"
+                                                                >Yes, delete</button>
+                                                                <button
+                                                                    className="px-2 py-1.5 rounded-lg bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs transition-all"
+                                                                    onClick={() => setConfirmDeleteId(null)}
+                                                                    type="button"
+                                                                >Cancel</button>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                className="px-3 py-1.5 rounded-lg bg-transparent text-red-400 font-medium flex items-center gap-1 text-sm border border-red-400 hover:bg-red-900/20 shadow-sm transition-all"
+                                                                style={{ minWidth: 0 }}
+                                                                onClick={() => setConfirmDeleteId(post.id)}
+                                                                type="button"
+                                                            >
+                                                                <Trash2 size={14} /> Delete
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}

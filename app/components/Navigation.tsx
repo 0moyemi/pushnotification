@@ -15,6 +15,11 @@ export default function Navigation() {
     const [showSections, setShowSections] = useState(true);
     const pathname = usePathname();
 
+    // Auto-collapse nav on navigation
+    function handleNavClick() {
+        setShowSections(false);
+    }
+
     return (
         <>
             {/* Mobile Header */}
@@ -43,9 +48,11 @@ export default function Navigation() {
                         <div className="grid grid-cols-2 gap-3">
                             {navItems.map((item) => {
                                 const Icon = item.icon;
-                                const isActive = pathname.startsWith(item.href);
+                                const isActive = item.href === "/schedule"
+                                    ? (pathname === "/" || pathname.startsWith("/schedule"))
+                                    : pathname.startsWith(item.href);
                                 return (
-                                    <Link href={item.href} key={item.href} className="focus:outline-none">
+                                    <Link href={item.href} key={item.href} className="focus:outline-none" onClick={handleNavClick}>
                                         <div
                                             className={`flex flex-col items-center justify-center gap-2.5 py-5 px-4 rounded-2xl font-bold transition-all shadow-sm ${isActive ? "bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-lg" : "bg-blue-950 text-blue-200 opacity-60"}`}
                                         >
@@ -73,7 +80,9 @@ export default function Navigation() {
                 <nav className="flex-1 p-5 space-y-2">
                     {navItems.map((item) => {
                         const Icon = item.icon;
-                        const isActive = pathname.startsWith(item.href);
+                        const isActive = item.href === "/schedule"
+                            ? (pathname === "/" || pathname.startsWith("/schedule"))
+                            : pathname.startsWith(item.href);
                         return (
                             <Link href={item.href} key={item.href} className="focus:outline-none">
                                 <div
